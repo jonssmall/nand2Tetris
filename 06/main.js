@@ -3,10 +3,15 @@
 const fs = require('fs');
 const codeModule = require('./code');
 
+const filename = process.argv[2];
+if (!filename.endsWith('.asm')) {
+    throw new Error('Please use the .asm file extension. Aborting...');
+}
+
 fs.readFile(process.argv[2], 'utf8', (err,data) => {
     if (err) throw err;
 
-    fs.writeFile('program.hack', parse(data), () => {
+    fs.writeFile(filename.split('.')[0] + '.hack', parse(data), () => {
         console.log('Done writing.');
     });
 });
