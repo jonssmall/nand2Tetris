@@ -65,6 +65,11 @@ parser.dest = function() {
 
 parser.comp = function() {
     // either AFTER an '=' or BEFORE a ';' depending on if jump or dest are omitted
+    const segment = this.currentCommand.includes(';') ? 
+                    this.currentCommand.substring(0, this.currentCommand.indexOf(';')) :
+                    this.currentCommand.substring(this.currentCommand.indexOf('=') + 1);
+
+    return codeModule.comp(segment);
 }
 
 parser.jump = function() {
@@ -82,7 +87,7 @@ parser.toBinary = function() {
         } else if (this.commandType() === 'L_COMMAND') {
             // label magic goes here
         } else {
-            this.output.push(this.comp() + this.dest() + this.jump());
+            this.output.push('111' + this.comp() + this.dest() + this.jump());
         }
 
 
