@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const codeModule = require('./code');
+const symbolTable = require('./symbolTable');
 
 const filename = process.argv[2];
 if (!filename.endsWith('.asm')) {
@@ -19,25 +20,44 @@ fs.readFile(process.argv[2], 'utf8', (err,data) => {
 function parse(fileInput) {
     const lines = fileInput.split(/\r?\n/)
                            .filter(l => l && !l.startsWith('//'));
+
+    buildSymbols(lines);
+
     return linesToBinary(lines).join('\n');
 }
 
-function linesToBinary(linesArray, outputArray = []) {
-    if (linesArray.length) {
-        outputArray.push(translate(linesArray.shift()));
-        return linesToBinary(linesArray, outputArray);
-    } else {
-        return outputArray;
-    }
+// function linesToBinary(linesArray, outputArray = []) { // MAXIMUM CALL STACK, TAIL CALLS WHERE ARE YOU?!
+//     if (!linesArray.length) {
+//         return outputArray;
+//     } else {
+//         const cleanLine = sanitizeLine(linesArray.shift());
+//         if (commandType(cleanLine) !== 'L_COMMAND') { // pseudo-commands stripped out on 2nd pass
+//             outputArray.push(translate(cleanLine));
+//         }
+//         return linesToBinary(linesArray, outputArray);
+//     }
+// }
+
+function linesToBinary(linesArray) { // MAXIMUM CALL STACK, TAIL CALLS WHERE ARE YOU?!
+    const binaryArray = [];
+    
+    linesArray.forEach(l => {
+        const cleanLine = sanitizeLine(l);
+        if (commandType(cleanLine) !== 'L_COMMAND') { // pseudo-commands stripped out on 2nd pass
+            binaryArray.push(translate(cleanLine));
+        }
+    });
+    
+    return binaryArray;
 }
 
 function translate(line) {
+
     const commandLookup = {
         'A_COMMAND': symbol,
-        'C_COMMAND': cInstruction,
-        'L_COMMAND': () => 'to be implemented'
+        'C_COMMAND': cInstruction
     };
-
+    
     return commandLookup[commandType(line)](line); // gross.
 }
 
@@ -55,9 +75,24 @@ function commandType(line) {
     }
 }
 
+let nextRam = 16; // mysterious closure, used and mutated by symbol();
+
 function symbol(line) {
-    // todo: replace symbol-less version
-    return parseInt(line.substring(1)).toString(2).padStart(16, '0');
+    const segment = line.substring(1);
+
+    if (!isNaN(segment)) {
+        return binary16(segment);
+    } else {
+        const tryGet = symbolTable.getAddress(segment);
+        if (tryGet) {
+            return binary16(tryGet);
+        } else {
+            const address = symbolTable.addEntry(segment, nextRam.toString());
+            nextRam++
+            return binary16(address);
+        }
+    }
+
 }
 
 function dest(line) {
@@ -87,4 +122,24 @@ function jump(line) {
 
 function cInstruction(line) {
     return '111' + comp(line) + dest(line) + jump(line);
+}
+
+function buildSymbols(lineArray) {
+    let romAddress = 0;
+    lineArray.forEach(line => {
+        if (commandType(line) === 'L_COMMAND') {
+            const symbol = line.substring(1, line.length - 1);
+            symbolTable.addEntry(symbol, romAddress);
+        } else {
+            romAddress++;
+        }
+    });
+}
+
+function binary16(numString) {
+    return parseInt(numString).toString(2).padStart(16, '0');
+}
+
+function sanitizeLine(line) { // remove comments and whitespace within a line
+    return line.replace(/\/\/.*/, '').trim();
 }
