@@ -1,99 +1,85 @@
 'use strict';
+
 const fs = require('fs');
 const codeModule = require('./code');
 
 fs.readFile(process.argv[2], 'utf8', (err,data) => {
-  if (err) throw err;
-  parse(data);
-});
+    if (err) throw err;
 
-// todo: constructor w/ file input?
+    fs.writeFile('program.hack', parse(data), () => {
+        console.log('Done writing.');
+    });
+});
 
 function parse(fileInput) {
     const lines = fileInput.split(/\r?\n/)
                            .filter(l => l && !l.startsWith('//'));
-    parser.new(lines);
-    parser.toBinary();
+    return linesToBinary(lines).join('\n');
 }
 
-const parser = {};
-parser.currentCommand = '';
-parser.lines = [];
-parser.output = [];
-
-parser.new = function(linesArray) {
-    this.lines = linesArray;
-    if (this.hasMoreCommands()) { // non-empty
-        this.advance();
+function linesToBinary(linesArray, outputArray = []) {
+    if (linesArray.length) {
+        outputArray.push(translate(linesArray.shift()));
+        return linesToBinary(linesArray, outputArray);
+    } else {
+        return outputArray;
     }
 }
 
-parser.hasMoreCommands = function() {
-    return this.lines.length;
+function translate(line) {
+    const commandLookup = {
+        'A_COMMAND': symbol,
+        'C_COMMAND': cInstruction,
+        'L_COMMAND': () => 'to be implemented'
+    };
+
+    return commandLookup[commandType(line)](line); // gross.
 }
 
-parser.advance = function() {
-    this.currentCommand = this.lines.shift();
-}
-
-parser.commandType = function() {
+function commandType(line) {
     // todo: types for different commands?
     // todo: safe to default to C_COMMAND? 
     //       what about throwing errors for syntax?
 
-    if (this.currentCommand.startsWith('@')) {
+    if (line.startsWith('@')) {
         return 'A_COMMAND';
-    } else if (this.currentCommand.startsWith('(')) {
+    } else if (line.startsWith('(')) {
         return 'L_COMMAND';
     } else {
         return 'C_COMMAND';
     }
 }
 
-parser.symbol = function() {    
+function symbol(line) {
     // todo: replace symbol-less version
-    return parseInt(this.currentCommand.substring(1)).toString(2).padStart(16, '0');
+    return parseInt(line.substring(1)).toString(2).padStart(16, '0');
 }
 
-parser.dest = function() {
-    if (this.currentCommand.includes('=')) {
-        return codeModule.dest(this.currentCommand.substring(0, this.currentCommand.indexOf('=')));
+function dest(line) {
+    if (line.includes('=')) {
+        return codeModule.dest(line.substring(0, line.indexOf('=')));
     } else {
         return codeModule.dest('null');
     }
 }
 
-parser.comp = function() {
+function comp(line) {
     // either AFTER an '=' or BEFORE a ';' depending on if jump or dest are omitted
-    const segment = this.currentCommand.includes(';') ? 
-                    this.currentCommand.substring(0, this.currentCommand.indexOf(';')) :
-                    this.currentCommand.substring(this.currentCommand.indexOf('=') + 1);
+    const segment = line.includes(';') ? 
+                    line.substring(0, line.indexOf(';')) :
+                    line.substring(line.indexOf('=') + 1);
 
     return codeModule.comp(segment);
 }
 
-parser.jump = function() {
-    if (this.currentCommand.includes(';')) {
-        return codeModule.jump(this.currentCommand.substring(this.currentCommand.indexOf(';') + 1));
+function jump(line) {
+    if (line.includes(';')) {
+        return codeModule.jump(line.substring(line.indexOf(';') + 1));
     } else {
         return codeModule.jump('null');
     }
 }
 
-parser.toBinary = function() {
-    while(this.hasMoreCommands()) {
-        if (this.commandType() === 'A_COMMAND') {
-            this.output.push(this.symbol());
-        } else if (this.commandType() === 'L_COMMAND') {
-            // label magic goes here
-        } else {
-            this.output.push('111' + this.comp() + this.dest() + this.jump());
-        }
-
-
-        // this.output.push(translate(this.currentCommand));
-        this.advance();
-    }
-    console.log('Done');
-    console.log(this.output.join('\n'));
+function cInstruction(line) {
+    return '111' + comp(line) + dest(line) + jump(line);
 }

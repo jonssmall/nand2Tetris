@@ -1,3 +1,5 @@
+'use strict';
+
 const code = {};
 
 code.dest = function(mnemonic) {
