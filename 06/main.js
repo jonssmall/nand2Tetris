@@ -7,23 +7,19 @@ fs.readFile(process.argv[2], 'utf8', (err,data) => {
   parse(data);
 });
 
-
-// remove whitespace
-// remove commented lined
-
 // todo: constructor w/ file input?
-// todo: types for different commands?
 
 function parse(fileInput) {
     const lines = fileInput.split(/\r?\n/)
                            .filter(l => l && !l.startsWith('//'));
-
-    console.log(lines);
+    parser.new(lines);
+    parser.toBinary();
 }
 
 const parser = {};
 parser.currentCommand = '';
 parser.lines = [];
+parser.output = [];
 
 parser.new = function(linesArray) {
     this.lines = linesArray;
@@ -41,28 +37,58 @@ parser.advance = function() {
 }
 
 parser.commandType = function() {
-    // currentCommand type :
-    // A_COMMAND @Xxx is either symbol or decimal number
-    // C_COMMAND dest=comp;jump
-    // L_COMMAND (Xxx) psuedo command w/ Xxx symbol
+    // todo: types for different commands?
+    // todo: safe to default to C_COMMAND? 
+    //       what about throwing errors for syntax?
+
+    if (this.currentCommand.startsWith('@')) {
+        return 'A_COMMAND';
+    } else if (this.currentCommand.startsWith('(')) {
+        return 'L_COMMAND';
+    } else {
+        return 'C_COMMAND';
+    }
 }
 
-parser.symbol = function() {
-    // returns symbol or number from A or L commmands
+parser.symbol = function() {    
+    // todo: replace symbol-less version
+    return parseInt(this.currentCommand.substring(1)).toString(2).padStart(16, '0');
 }
 
 parser.dest = function() {
-    // dest mnemonic (8 types to lookup) of current C command
-    // CHECK IF C COMMAND
+    if (this.currentCommand.includes('=')) {
+        return codeModule.dest(this.currentCommand.substring(0, this.currentCommand.indexOf('=')));
+    } else {
+        return codeModule.dest('null');
+    }
 }
 
 parser.comp = function() {
-    // comp mnemonic (28 types to lookup) of current C command
-    // CHECK IF C COMMAND
+    // either AFTER an '=' or BEFORE a ';' depending on if jump or dest are omitted
 }
 
 parser.jump = function() {
-    // jump mnemonic (8 types to lookup) of current C command
-    // CHECK IF C COMMAND
+    if (this.currentCommand.includes(';')) {
+        return codeModule.jump(this.currentCommand.substring(this.currentCommand.indexOf(';') + 1));
+    } else {
+        return codeModule.jump('null');
+    }
 }
 
+parser.toBinary = function() {
+    while(this.hasMoreCommands()) {
+        if (this.commandType() === 'A_COMMAND') {
+            this.output.push(this.symbol());
+        } else if (this.commandType() === 'L_COMMAND') {
+            // label magic goes here
+        } else {
+            this.output.push(this.comp() + this.dest() + this.jump());
+        }
+
+
+        // this.output.push(translate(this.currentCommand));
+        this.advance();
+    }
+    console.log('Done');
+    console.log(this.output.join('\n'));
+}
