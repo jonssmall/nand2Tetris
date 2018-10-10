@@ -1,0 +1,51 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/01/DMux8Way.hdl
+
+/**
+ * 8-way demultiplexor:
+ * {a, b, c, d, e, f, g, h} = {in, 0, 0, 0, 0, 0, 0, 0} if sel == 000
+ *                            {0, in, 0, 0, 0, 0, 0, 0} if sel == 001
+ *                            etc.
+ *                            {0, 0, 0, 0, 0, 0, 0, in} if sel == 111
+ */
+
+CHIP DMux8Way {
+    IN in, sel[3];
+    OUT a, b, c, d, e, f, g, h;
+
+    PARTS:
+    // Put your code here:
+    DMux4Way(in=in, sel[0]=sel[0], sel[1]=sel[1], a=w, b=x, c=y, d=z);
+    Not(in=sel[2], out=n);
+    And(a=w, b=n, out=a);
+    And(a=x, b=n, out=b);
+    And(a=y, b=n, out=c);
+    And(a=z, b=n, out=d);
+
+    And(a=w, b=sel[2], out=e);
+    And(a=x, b=sel[2], out=f);
+    And(a=y, b=sel[2], out=g);
+    And(a=z, b=sel[2], out=h);
+}
+
+/*
+
+function EightWayDMUX(input, sel2, sel1, sel0) {
+  const temp = FourWayDMUX(input, sel1, sel0);
+  const [t1, t2, t3, t4] = [temp.a, temp.b, temp.c, temp.d];
+  
+  return {
+    a: AND(t1, NOT(sel2)),
+    b: AND(t2, NOT(sel2)),
+    c: AND(t3, NOT(sel2)),
+    d: AND(t4, NOT(sel2)),
+    e: AND(t1, sel2),
+    f: AND(t2, sel2),
+    g: AND(t3, sel2),
+    h: AND(t4, sel2),
+  };
+}
+
+*/
